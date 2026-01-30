@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyse de la Démocratie Belge - Tableau de Bord Interactif</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #fdfbf7; color: #1f2937; }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            height: 400px;
+            max-height: 500px;
+        }
+        .active-tab {
+            border-bottom: 3px solid #e11d48;
+            color: #e11d48;
+            font-weight: 600;
+        }
+        .inactive-tab {
+            border-bottom: 3px solid transparent;
+            color: #6b7280;
+        }
+        .inactive-tab:hover {
+            color: #374151;
+            border-bottom: 3px solid #d1d5db;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .level-indicator {
+            transition: all 0.3s ease;
+        }
+    </style>
+    <!-- Chosen Palette: Warm Neutral Background (#fdfbf7) with Belgian Tricolor Accents (Muted Black #1f2937, Yellow-Gold #d97706, Red #e11d48) and Slate Blue for neutrality. -->
+    <!-- Application Structure Plan: The app is designed as an educational dashboard to deconstruct the complexity of the Belgian system. 
+         1. Header: Sets the context.
+         2. Navigation: Functional tabs (Structure, Dynamics, Performance, Reforms) to guide the user through different analytical lenses.
+         3. Dynamic Content Area: 
+            - Structure: Interactive "Layer Cake" diagram to explain Federal/Regional/Community competencies (Key for understanding the "Lasagne").
+            - Dynamics: Scatter plot of the political landscape (North vs South, Left vs Right) to visualize fragmentation.
+            - Performance: Charts showing government formation times and blank votes.
+            - Reforms: Interactive list of potential democratic innovations.
+         4. Footer: Summary.
+         Rationale: The Belgian system is notoriously complex. A tabbed dashboard allows users to digest one dimension of complexity at a time without scrolling fatigue. -->
+    <!-- Visualization & Content Choices:
+         - Institutional Structure: Uses interactive HTML cards (Grid) instead of static text. Goal: Organize. Interaction: Click to reveal competencies. Library: HTML/JS.
+         - Political Landscape: Plotly Scatter Plot. Goal: Relationships. Visualizes the unique split party system (no national parties). Interaction: Zoom/Hover. Library: Plotly.
+         - Formation Time: Chart.js Bar Chart. Goal: Compare. Highlights the "world record" delays. Interaction: Tooltip context. Library: Chart.js.
+         - Trust/Blank Votes: Chart.js Line Chart. Goal: Inform/Change. Shows trends in voter disengagement. Library: Chart.js.
+         - Supporting the prompt's request for "human discoverability," the layout is clean, text is chunked, and data is visualized. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Header Section -->
+    <header class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900 tracking-tight">Observatoire de la Démocratie Belge</h1>
+                    <p class="mt-1 text-sm text-gray-500">Comprendre la complexité, analyser les défis et explorer les réformes.</p>
+                </div>
+                <div class="mt-4 md:mt-0 flex space-x-2">
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                        Complexité : Élevée
+                    </span>
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        État : Fédéral
+                    </span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex space-x-8 overflow-x-auto" aria-label="Tabs">
+                <button onclick="switchTab('structure')" id="tab-structure" class="active-tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200">
+                    Structure Institutionnelle
+                </button>
+                <button onclick="switchTab('landscape')" id="tab-landscape" class="inactive-tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200">
+                    Paysage Politique
+                </button>
+                <button onclick="switchTab('performance')" id="tab-performance" class="inactive-tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200">
+                    Performance & Défis
+                </button>
+                <button onclick="switchTab('reforms')" id="tab-reforms" class="inactive-tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200">
+                    Pistes de Réforme
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow bg-[#fdfbf7]">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+            <!-- VIEW: STRUCTURE (La Lasagne) -->
+            <div id="view-structure" class="space-y-8 animate-fade-in">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-xl font-bold text-gray-900 mb-4">La "Lasagne" Institutionnelle</h2>
+                    <p class="text-gray-600 mb-6 leading-relaxed">
+                        La Belgique est célèbre pour sa structure étatique complexe, souvent qualifiée de "lasagne". 
+                        Ce système n'est pas hiérarchique mais repose sur l'<strong>équipollence des normes</strong> : 
+                        une loi fédérale a la même valeur juridique qu'un décret régional. 
+                        Cliquez sur les niveaux ci-dessous pour découvrir leurs compétences exclusives.
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- Federal -->
+                        <div class="col-span-1 md:col-span-3 bg-gray-50 border border-gray-200 rounded-lg p-4 cursor-pointer card-hover transition-all" onclick="toggleDetails('federal-details')">
+                            <div class="flex justify-between items-center">
+                                <h3 class="font-bold text-lg text-gray-800">1. L'État Fédéral</h3>
+                                <span class="text-2xl text-gray-400 font-light">+</span>
+                            </div>
+                            <div id="federal-details" class="hidden mt-4 pt-4 border-t border-gray-200 text-gray-700">
+                                <p class="mb-2 font-semibold text-sm text-gray-500 uppercase">Compétences clés :</p>
+                                <ul class="list-disc list-inside space-y-1 ml-2">
+                                    <li>Finances & Fiscalité nationale</li>
+                                    <li>Justice & Intérieur (Police)</li>
+                                    <li>Sécurité Sociale (Pensions, chômage)</li>
+                                    <li>Affaires Étrangères (partagées)</li>
+                                    <li>Défense nationale</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Communities -->
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 cursor-pointer card-hover transition-all" onclick="toggleDetails('com-details')">
+                            <div class="flex justify-between items-center">
+                                <h3 class="font-bold text-lg text-yellow-900">2. Les Communautés (3)</h3>
+                                <span class="text-2xl text-yellow-700 font-light">+</span>
+                            </div>
+                            <p class="text-xs text-yellow-800 mt-1">Lien avec les personnes (Langue/Culture)</p>
+                            <div id="com-details" class="hidden mt-4 pt-4 border-t border-yellow-200 text-gray-700">
+                                <ul class="list-disc list-inside space-y-1 ml-2 text-sm">
+                                    <li>Enseignement</li>
+                                    <li>Culture & Médias</li>
+                                    <li>Aide à la jeunesse</li>
+                                    <li>Sports</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Regions -->
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 cursor-pointer card-hover transition-all" onclick="toggleDetails('reg-details')">
+                            <div class="flex justify-between items-center">
+                                <h3 class="font-bold text-lg text-blue-900">3. Les Régions (3)</h3>
+                                <span class="text-2xl text-blue-700 font-light">+</span>
+                            </div>
+                            <p class="text-xs text-blue-800 mt-1">Lien avec le sol (Territoire/Économie)</p>
+                            <div id="reg-details" class="hidden mt-4 pt-4 border-t border-blue-200 text-gray-700">
+                                <ul class="list-disc list-inside space-y-1 ml-2 text-sm">
+                                    <li>Économie & Emploi</li>
+                                    <li>Environnement & Eau</li>
+                                    <li>Logement & Urbanisme</li>
+                                    <li>Transports publics</li>
+                                    <li>Agriculture</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Local -->
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer card-hover transition-all md:col-span-1" onclick="toggleDetails('loc-details')">
+                            <div class="flex justify-between items-center">
+                                <h3 class="font-bold text-lg text-green-900">4. Provinces & Communes</h3>
+                                <span class="text-2xl text-green-700 font-light">+</span>
+                            </div>
+                            <div id="loc-details" class="hidden mt-4 pt-4 border-t border-green-200 text-gray-700">
+                                <ul class="list-disc list-inside space-y-1 ml-2 text-sm">
+                                    <li>Maintien de l'ordre local</li>
+                                    <li>État civil</li>
+                                    <li>Entretien de la voirie locale</li>
+                                    <li>Écoles communales</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Simulation Block -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Exemple Concret : Qui gère quoi ?</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="p-4 border border-gray-100 rounded bg-gray-50">
+                            <p class="font-semibold">Un chômeur cherche un emploi.</p>
+                            <p class="text-sm mt-2 text-gray-600">Il reçoit ses allocations du <span class="font-bold text-gray-800">Fédéral</span> (ONEM), mais est accompagné par la <span class="font-bold text-blue-600">Région</span> (Forem/Actiris/VDAB) pour trouver du travail.</p>
+                        </div>
+                        <div class="p-4 border border-gray-100 rounded bg-gray-50">
+                            <p class="font-semibold">Construction d'une école.</p>
+                            <p class="text-sm mt-2 text-gray-600">Le bâtiment (Urbanisme) dépend de la <span class="font-bold text-blue-600">Région</span>, les professeurs sont payés par la <span class="font-bold text-yellow-600">Communauté</span>, et l'école peut appartenir à la <span class="font-bold text-green-600">Commune</span>.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: LANDSCAPE -->
+            <div id="view-landscape" class="hidden space-y-8 animate-fade-in">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-xl font-bold text-gray-900 mb-2">Fragmentation Politique</h2>
+                    <p class="text-gray-600 mb-6">
+                        Il n'y a pas de partis nationaux en Belgique, mais deux systèmes partisans distincts (Francophone et Néerlandophone). 
+                        Ce graphique positionne les principaux acteurs selon deux axes : l'axe économique (Gauche/Droite) et l'axe institutionnel (Unitarisme/Séparatisme).
+                    </p>
+                    
+                    <div class="bg-gray-50 rounded-xl p-2 border border-gray-200">
+                        <!-- Plotly Chart Container -->
+                        <div id="politicalCompass" class="chart-container" style="height: 500px;"></div>
+                    </div>
+                    
+                    <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-center">
+                        <div class="p-2 bg-blue-50 rounded text-blue-800 font-semibold">Libéraux (MR / Open VLD)</div>
+                        <div class="p-2 bg-red-50 rounded text-red-800 font-semibold">Socialistes (PS / Vooruit)</div>
+                        <div class="p-2 bg-green-50 rounded text-green-800 font-semibold">Écologistes (Ecolo / Groen)</div>
+                        <div class="p-2 bg-yellow-50 rounded text-yellow-800 font-semibold">Nationalistes (N-VA / VB)</div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Le Cordon Sanitaire</h3>
+                    <p class="text-gray-700 leading-relaxed">
+                        Un concept clé de la démocratie belge. Il s'agit d'un accord (médiatique et politique) visant à exclure les partis d'extrême droite du pouvoir. 
+                        Si ce cordon est strict côté francophone (aucun débat), il est sous pression côté flamand où le Vlaams Belang réalise des scores très importants.
+                    </p>
+                </div>
+            </div>
+
+            <!-- VIEW: PERFORMANCE -->
+            <div id="view-performance" class="hidden space-y-8 animate-fade-in">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    
+                    <!-- Chart: Formation Time -->
+                    <div class="bg-white rounded-lg shadow p-6 flex flex-col">
+                        <h2 class="text-xl font-bold text-gray-900 mb-2">Temps de Formation du Gouvernement</h2>
+                        <p class="text-sm text-gray-500 mb-4">Jours nécessaires pour former un gouvernement fédéral après les élections.</p>
+                        <div class="flex-grow w-full relative">
+                            <div class="chart-container h-80">
+                                <canvas id="formationChart"></canvas>
+                            </div>
+                        </div>
+                        <p class="mt-4 text-xs text-gray-400 italic text-center">La Belgique détient le record mondial sans gouvernement de plein exercice (2010-2011).</p>
+                    </div>
+
+                    <!-- Chart: Blank Votes -->
+                    <div class="bg-white rounded-lg shadow p-6 flex flex-col">
+                        <h2 class="text-xl font-bold text-gray-900 mb-2">Le Vote Blanc & Nul</h2>
+                        <p class="text-sm text-gray-500 mb-4">Malgré le vote obligatoire, une partie croissante de l'électorat rejette l'offre politique.</p>
+                        <div class="flex-grow w-full relative">
+                            <div class="chart-container h-80">
+                                <canvas id="voteChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="mt-4 bg-gray-100 p-3 rounded text-sm text-gray-700">
+                            <strong>Note :</strong> En Belgique, le vote blanc n'est pas comptabilisé dans la répartition des sièges. Il favorise mathématiquement les plus grands partis.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-lg shadow text-center border-t-4 border-red-500">
+                        <p class="text-gray-500 text-sm uppercase tracking-wide">Taux de Participation</p>
+                        <p class="text-3xl font-bold text-gray-900 my-2">88.4%</p>
+                        <p class="text-xs text-gray-400">Élections 2019 (Obligatoire)</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow text-center border-t-4 border-yellow-500">
+                        <p class="text-gray-500 text-sm uppercase tracking-wide">Nombre de Ministres</p>
+                        <p class="text-3xl font-bold text-gray-900 my-2">± 50</p>
+                        <p class="text-xs text-gray-400">Tous niveaux confondus (Est.)</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow text-center border-t-4 border-blue-500">
+                        <p class="text-gray-500 text-sm uppercase tracking-wide">Complexité perçue</p>
+                        <p class="text-3xl font-bold text-gray-900 my-2">Critique</p>
+                        <p class="text-xs text-gray-400">Baromètre citoyen</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: REFORMS -->
+            <div id="view-reforms" class="hidden space-y-8 animate-fade-in">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-xl font-bold text-gray-900 mb-4">Innovations & Pistes de Réforme</h2>
+                    <p class="text-gray-600 mb-8">
+                        Face à l'essoufflement du modèle représentatif classique, la Belgique expérimente. 
+                        Voici quelques initiatives notables ou débattues pour revitaliser la démocratie.
+                    </p>
+
+                    <div class="space-y-4">
+                        <!-- Reform Item 1 -->
+                        <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                            <div class="flex items-start">
+                                <div class="flex-shrink-0 h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">1</div>
+                                <div class="ml-4">
+                                    <h3 class="text-lg font-medium text-gray-900">Commissions Délibératives</h3>
+                                    <p class="mt-1 text-gray-600">Mises en place au Parlement bruxellois. Des citoyens tirés au sort siègent aux côtés des députés élus pour débattre et formuler des recommandations.</p>
+                                    <div class="mt-2 flex gap-2">
+                                        <span class="px-2 py-0.5 rounded text-xs bg-green-100 text-green-800">Actif</span>
+                                        <span class="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-600">Bruxelles</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Reform Item 2 -->
+                        <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                            <div class="flex items-start">
+                                <div class="flex-shrink-0 h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold">2</div>
+                                <div class="ml-4">
+                                    <h3 class="text-lg font-medium text-gray-900">Circonscription Fédérale</h3>
+                                    <p class="mt-1 text-gray-600">Proposition de créer une liste électorale unique pour tout le pays, permettant aux Flamands de voter pour des Francophones et vice-versa, pour renforcer l'unité.</p>
+                                    <div class="mt-2 flex gap-2">
+                                        <span class="px-2 py-0.5 rounded text-xs bg-yellow-100 text-yellow-800">En débat</span>
+                                        <span class="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-600">Fédéral</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Reform Item 3 -->
+                        <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                            <div class="flex items-start">
+                                <div class="flex-shrink-0 h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold">3</div>
+                                <div class="ml-4">
+                                    <h3 class="text-lg font-medium text-gray-900">Suppression du Sénat</h3>
+                                    <p class="mt-1 text-gray-600">Le Sénat a perdu la plupart de ses pouvoirs. Beaucoup plaident pour sa suppression pure et simple afin de simplifier la structure institutionnelle.</p>
+                                    <div class="mt-2 flex gap-2">
+                                        <span class="px-2 py-0.5 rounded text-xs bg-red-100 text-red-800">Controversé</span>
+                                        <span class="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-600">Structurel</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white mt-auto py-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p class="text-sm text-gray-400">
+                Généré par IA pour l'analyse de ouaisfi.eu/democratie-belge<br>
+                Ce tableau de bord est une synthèse basée sur les connaissances du système politique belge.
+            </p>
+            <div class="mt-4 flex justify-center space-x-4 text-xs text-gray-500">
+                <span>© 2024 Observatoire Démo</span>
+                <span>•</span>
+                <span>Données simulées à titre illustratif</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // --- Navigation Logic ---
+        function switchTab(tabId) {
+            // Hide all views
+            ['structure', 'landscape', 'performance', 'reforms'].forEach(id => {
+                document.getElementById('view-' + id).classList.add('hidden');
+                const btn = document.getElementById('tab-' + id);
+                btn.classList.remove('active-tab');
+                btn.classList.add('inactive-tab');
+            });
+
+            // Show selected view
+            document.getElementById('view-' + tabId).classList.remove('hidden');
+            const activeBtn = document.getElementById('tab-' + tabId);
+            activeBtn.classList.remove('inactive-tab');
+            activeBtn.classList.add('active-tab');
+
+            // Trigger chart resize if needed
+            if (tabId === 'landscape') {
+                setTimeout(() => { Plotly.Plots.resize('politicalCompass'); }, 50);
+            }
+        }
+
+        // --- Interaction: Accordion ---
+        function toggleDetails(id) {
+            const el = document.getElementById(id);
+            if (el.classList.contains('hidden')) {
+                el.classList.remove('hidden');
+            } else {
+                el.classList.add('hidden');
+            }
+        }
+
+        // --- Data Visualization: Political Compass (Plotly) ---
+        const compassData = [
+            { name: 'PTB/PVDA', x: -0.9, y: 0.2, color: '#8B0000', lang: 'Bi' },
+            { name: 'PS', x: -0.6, y: 0.1, color: '#FF0000', lang: 'FR' },
+            { name: 'Vooruit', x: -0.5, y: 0.2, color: '#FF4500', lang: 'NL' },
+            { name: 'Ecolo', x: -0.7, y: 0.6, color: '#008000', lang: 'FR' },
+            { name: 'Groen', x: -0.65, y: 0.65, color: '#228B22', lang: 'NL' },
+            { name: 'Les Engagés', x: -0.1, y: 0.1, color: '#40E0D0', lang: 'FR' },
+            { name: 'CD&V', x: 0.1, y: 0.3, color: '#FFA500', lang: 'NL' },
+            { name: 'MR', x: 0.6, y: -0.2, color: '#0000FF', lang: 'FR' },
+            { name: 'Open VLD', x: 0.65, y: -0.1, color: '#00008B', lang: 'NL' },
+            { name: 'N-VA', x: 0.7, y: 0.8, color: '#FFD700', lang: 'NL' },
+            { name: 'Vlaams Belang', x: 0.8, y: 0.9, color: '#4B3621', lang: 'NL' },
+            { name: 'DéFI', x: 0.0, y: -0.5, color: '#FF00FF', lang: 'FR' }
+        ];
+
+        const trace = {
+            x: compassData.map(d => d.x),
+            y: compassData.map(d => d.y),
+            mode: 'markers+text',
+            type: 'scatter',
+            text: compassData.map(d => d.name),
+            textposition: 'top center',
+            marker: { size: 12, color: compassData.map(d => d.color) },
+            hoverinfo: 'text',
+            hovertext: compassData.map(d => `${d.name} (${d.lang})<br>Gauche/Droite: ${d.x}<br>Unit/Sép: ${d.y}`)
+        };
+
+        const layout = {
+            title: false,
+            margin: { t: 20, b: 40, l: 40, r: 20 },
+            xaxis: { 
+                title: 'Gauche (Économie) ↔ Droite', 
+                range: [-1.2, 1.2],
+                zeroline: true,
+                zerolinecolor: '#9ca3af'
+            },
+            yaxis: { 
+                title: 'Unitaire (Belgique) ↔ Séparatiste (Régions)', 
+                range: [-1, 1.2],
+                zeroline: true,
+                zerolinecolor: '#9ca3af'
+            },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            font: { family: 'Inter, sans-serif' }
+        };
+
+        // --- Chart.js Configurations ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Init Plotly
+            Plotly.newPlot('politicalCompass', [trace], layout, {responsive: true, displayModeBar: false});
+
+            // Formation Chart
+            const ctxForm = document.getElementById('formationChart').getContext('2d');
+            new Chart(ctxForm, {
+                type: 'bar',
+                data: {
+                    labels: ['Moyenne historique', '2007 (Leterme)', '2019 (De Croo)', '2010 (Di Rupo - Record)'],
+                    datasets: [{
+                        label: 'Jours de formation',
+                        data: [60, 194, 493, 541],
+                        backgroundColor: ['#9ca3af', '#fbbf24', '#f87171', '#dc2626'],
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: 'Jours' } }
+                    }
+                }
+            });
+
+            // Vote Chart
+            const ctxVote = document.getElementById('voteChart').getContext('2d');
+            new Chart(ctxVote, {
+                type: 'line',
+                data: {
+                    labels: ['2003', '2007', '2010', '2014', '2019', '2024 (Proj)'],
+                    datasets: [{
+                        label: 'Votes Blancs/Nuls (%)',
+                        data: [5.2, 5.1, 5.8, 5.8, 6.4, 7.5],
+                        borderColor: '#4b5563',
+                        backgroundColor: 'rgba(75, 85, 99, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { 
+                            beginAtZero: false,
+                            min: 4,
+                            title: { display: true, text: '% des bulletins déposés' } 
+                        }
+                    }
+                }
+            });
+        });
+
+    </script>
+</body>
+</html>
